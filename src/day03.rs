@@ -41,8 +41,24 @@ fn part1(input: &str) -> usize {
     result.sum()
 }
 
-fn part2(_: &str) -> usize {
-    0
+fn part2(input: &str) -> usize {
+    let lines: Vec<&str> = input.lines().collect();
+
+    let result = lines.chunks(3).map(|chunk| -> usize {
+        let first: HashSet<char> = chunk[0].chars().collect();
+        let second: HashSet<char> = chunk[1].chars().collect();
+        let third: HashSet<char> = chunk[2].chars().collect();
+        let intersection1: HashSet<char> = first.intersection(&second).cloned().collect();
+        let intersection2: HashSet<char> = intersection1.intersection(&third).cloned().collect();
+
+        intersection2
+            .into_iter()
+            .next()
+            .expect("should have at least one intersection")
+            .priority()
+    });
+
+    result.sum()
 }
 
 #[cfg(test)]
@@ -67,6 +83,5 @@ mod tests {
     #[test]
     fn test_part2() {
         assert_eq!(part2(TESTINPUT), 70);
-        unimplemented!();
     }
 }
