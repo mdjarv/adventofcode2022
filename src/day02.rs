@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::str::FromStr;
 
 pub fn run() {
@@ -9,7 +10,7 @@ pub fn run() {
     println!();
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 enum Action {
     Rock,
     Paper,
@@ -17,6 +18,22 @@ enum Action {
 }
 
 impl Action {
+    fn action_from_result(&self, desired_result: &PlayResult) -> Action {
+        match desired_result {
+            PlayResult::Loose => match self {
+                Action::Rock => Action::Scissors,
+                Action::Paper => Action::Rock,
+                Action::Scissors => Action::Paper,
+            },
+            PlayResult::Win => match self {
+                Action::Rock => Action::Paper,
+                Action::Paper => Action::Scissors,
+                Action::Scissors => Action::Rock,
+            },
+            PlayResult::Draw => *self,
+        }
+    }
+
     fn score(&self) -> usize {
         match self {
             Action::Rock => 1,
@@ -31,10 +48,10 @@ impl FromStr for Action {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "A" => Ok(Action::Rock),
-            "B" => Ok(Action::Paper),
-            "C" => Ok(Action::Scissors),
-            _ => Err("invalid input".to_string())
+            "A" | "X" => Ok(Action::Rock),
+            "B" | "Y" => Ok(Action::Paper),
+            "C" | "Z" => Ok(Action::Scissors),
+            _ => Err("invalid input".to_string()),
         }
     }
 }
@@ -55,38 +72,24 @@ struct Play {
     player: Action,
 }
 
-impl FromStr for Play {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut parts = s.split(" ");
-
-        let opponent: Action = match parts.next().unwrap() {
-            "A" => Action::Rock,
-            "B" => Action::Paper,
-            "C" => Action::Scissors,
-            _ => return Err("invalid opponent input".to_string())
-        };
-
-        let player: Action = match parts.next().unwrap() {
-            "X" => Action::Rock,
-            "Y" => Action::Paper,
-            "Z" => Action::Scissors,
-            _ => return Err("invalid player input".to_string())
-        };
-
-        Ok(Play {
-            opponent,
-            player,
-        })
-    }
-}
-
 #[derive(Debug)]
 enum PlayResult {
     Win,
     Loose,
     Draw,
+}
+
+impl FromStr for PlayResult {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "X" => Ok(PlayResult::Loose),
+            "Y" => Ok(PlayResult::Draw),
+            "Z" => Ok(PlayResult::Win),
+            _ => Err("invalid input".to_string()),
+        }
+    }
 }
 
 impl PlayResult {
@@ -109,15 +112,15 @@ impl Play {
             Action::Rock => match self.opponent {
                 Action::Scissors => PlayResult::Win,
                 _ => PlayResult::Loose,
-            }
+            },
             Action::Paper => match self.opponent {
                 Action::Rock => PlayResult::Win,
                 _ => PlayResult::Loose,
-            }
+            },
             Action::Scissors => match self.opponent {
                 Action::Paper => PlayResult::Win,
                 _ => PlayResult::Loose,
-            }
+            },
         }
     }
 
@@ -127,13 +130,42 @@ impl Play {
 }
 
 fn part1(input: &str) -> usize {
-    let plays: Vec<Play> = input.lines().map(|l| Play::from_str(l).expect("failed to parse")).collect();
-    let results: Vec<usize> = plays.iter().map(|p| { p.score() }).collect();
-    return results.iter().sum();
+    let plays: Vec<Play> = input
+        .lines()
+        .map(|l| -> Result<Play, Box<dyn Error>> {
+            let mut parts = l.split(' ');
+
+            let opponent = Action::from_str(parts.next().unwrap())?;
+            let player = Action::from_str(parts.next().unwrap())?;
+
+            Ok(Play { opponent, player })
+        })
+        .into_iter()
+        .flatten()
+        .collect();
+
+    let results: Vec<usize> = plays.into_iter().map(|p| p.score()).collect();
+
+    results.iter().sum()
 }
 
-fn part2(_: &str) -> usize {
-    return 0;
+fn part2(input: &str) -> usize {
+    let plays: Vec<Play> = input
+        .lines()
+        .map(|l| -> Result<Play, Box<dyn Error>> {
+            let mut parts = l.split(' ');
+
+            let opponent: Action = Action::from_str(parts.next().unwrap())?;
+            let desired_result: PlayResult = PlayResult::from_str(parts.next().unwrap())?;
+            let player: Action = opponent.action_from_result(&desired_result);
+
+            Ok(Play { opponent, player })
+        })
+        .into_iter()
+        .flatten()
+        .collect();
+
+    plays.into_iter().map(|p| p.score()).sum()
 }
 
 #[cfg(test)]
@@ -147,8 +179,8 @@ mod tests {
         assert_eq!(part1(TESTINPUT), 15);
     }
 
-    // #[test]
-    // fn test_part2() {
-    //     assert_eq!(part2(TESTINPUT), 45000);
-    // }
+    #[test]
+    fn test_part2() {
+        assert_eq!(part2(TESTINPUT), 12);
+    }
 }
