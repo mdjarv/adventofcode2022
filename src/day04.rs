@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::ops::Add;
 use std::str::FromStr;
@@ -50,6 +51,14 @@ impl Sector {
         // println!("testing if {} fully contains {}", self, other);
         self.start <= other.start && self.end >= other.end
     }
+
+    fn overlaps(&self, other: &Sector) -> bool {
+        let a: HashSet<usize> = self.range.clone().into_iter().collect();
+        let b: HashSet<usize> = other.range.clone().into_iter().collect();
+
+        let intersection = a.intersection(&b);
+        intersection.count() > 0
+    }
 }
 
 impl Display for Sector {
@@ -89,8 +98,27 @@ fn part1(input: &str) -> usize {
     result
 }
 
-fn part2(_: &str) -> usize {
-    unimplemented!();
+fn part2(input: &str) -> usize {
+    let pairs: Vec<Vec<Sector>> = input
+        .lines()
+        .map(|l| -> Vec<Sector> {
+            l.split(',')
+                .map(|x| x.parse::<Sector>().expect("not a valid sector"))
+                .collect()
+        })
+        .collect();
+
+    let mut result: usize = 0;
+
+    for pair in pairs {
+        let sector1 = &pair[0];
+        let sector2 = &pair[1];
+        if sector1.overlaps(sector2) {
+            result += 1;
+        }
+    }
+
+    result
 }
 
 #[cfg(test)]
@@ -123,6 +151,6 @@ mod tests {
 
     #[test]
     fn test_part2() {
-        assert_eq!(part2(TESTINPUT), 0);
+        assert_eq!(part2(TESTINPUT), 4);
     }
 }
