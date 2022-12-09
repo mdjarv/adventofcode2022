@@ -15,21 +15,37 @@ struct Ship {
 }
 
 impl Ship {
+    fn top_str(&self) -> String {
+        let top: Vec<char> = self
+            .stacks
+            .iter()
+            .map(|s| *s.last().unwrap_or(&' '))
+            .collect();
+        // println!("top: {:?}", top);
+
+        top.into_iter().collect::<String>()
+    }
+
     fn execute_move(&mut self, m: Move) {
+        // println!("Moving: {}", m);
         let mut temp_stack: Vec<char> = vec![];
         for _i in 0..m.count {
-            for stack_index in 0..self.stacks[m.from].len() {
-                if self.stacks[m.from][stack_index] == ' ' {
-                    // skip empty
-                    continue;
-                }
-
-                temp_stack.push(self.stacks[m.from][stack_index]);
-                self.stacks[m.from][stack_index] = ' ';
-            }
+            temp_stack.push(self.stacks[m.from - 1].pop().unwrap())
         }
-        println!("temp stack: {:?}", temp_stack);
-        // m.from
+        for c in temp_stack {
+            self.stacks[m.to - 1].push(c);
+        }
+    }
+
+    fn execute_move_9001(&mut self, m: Move) {
+        // println!("Moving: {}", m);
+        let mut temp_stack: Vec<char> = vec![];
+        for _i in 0..m.count {
+            temp_stack.insert(0, self.stacks[m.from - 1].pop().unwrap())
+        }
+        for c in temp_stack {
+            self.stacks[m.to - 1].push(c);
+        }
     }
 }
 
@@ -42,32 +58,42 @@ impl FromStr for Ship {
         let stack_height = input.lines().position(|l| l.starts_with(" 1")).unwrap();
         // println!("stack height: {}", stack_height);
 
-        let stack_index: Vec<&str> = input
+        let stack_count: usize = input
             .lines()
             .nth(stack_height)
             .unwrap()
             .split_ascii_whitespace()
-            .collect();
+            .count();
 
-        // println!("found stack index: {:?}", stack_index);
-
-        for _i in 0..stack_index.len() {
-            let mut stack: Vec<char> = vec![];
-            for _j in 0..stack_height {
-                stack.push(' ');
-            }
-            ship.stacks.push(stack);
+        // Create stacks on ship
+        for _i in 0..stack_count {
+            ship.stacks.push(vec![]);
         }
 
-        for i in 0..ship.stacks[0].len() {
-            let chars: Vec<char> = input.lines().nth(i).unwrap().chars().collect();
+        for line in input.lines() {
+            if line.starts_with(" 1") {
+                break;
+            }
+
+            let chars: Vec<char> = line.chars().collect();
+
+            // Iterate stacks
             for stack_index in 0..ship.stacks.len() {
+                // Get stack crate index
                 let ci = 1 + stack_index * 4;
+
+                // No more chars? break
                 if chars.len() < ci {
                     break;
                 }
 
-                ship.stacks[stack_index][i] = chars[ci];
+                // No crate? Skip
+                if chars[ci] == ' ' {
+                    // Skip empty
+                    continue;
+                }
+
+                ship.stacks[stack_index].insert(0, chars[ci]);
             }
         }
 
@@ -77,13 +103,12 @@ impl FromStr for Ship {
 
 impl Display for Ship {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for height in 0..self.stacks[0].len() {
-            for stack in &self.stacks {
-                write!(f, "[{}] ", stack[height])?;
+        for stack in &self.stacks {
+            for c in stack {
+                write!(f, "[{}] ", c)?;
             }
             writeln!(f)?;
         }
-
         Ok(())
     }
 }
@@ -117,21 +142,39 @@ impl FromStr for Move {
     }
 }
 
-fn part1(input: &str) -> &str {
-    let ship = Ship::from_str(input).unwrap();
+fn part1(input: &str) -> String {
+    let mut ship = Ship::from_str(input).unwrap();
 
-    println!("Ship:\n{}", ship);
+    // println!("Ship:\n{}", ship);
 
-    let moves: Vec<Move> = input.lines().flat_map(Move::from_str).collect();
-    println!("Moves:");
+    let moves: Vec<Move> = input
+        .lines()
+        .filter(|l| l.starts_with("move"))
+        .flat_map(Move::from_str)
+        .collect();
+    // println!("Moves:");
     for m in moves {
-        println!("  {}", m);
+        // println!("  {}", m);
+        ship.execute_move(m);
     }
-    ""
+
+    ship.top_str()
 }
 
-fn part2(input: &str) -> &str {
-    unimplemented!("{}", input)
+fn part2(input: &str) -> String {
+    let mut ship = Ship::from_str(input).unwrap();
+
+    let moves: Vec<Move> = input
+        .lines()
+        .filter(|l| l.starts_with("move"))
+        .flat_map(Move::from_str)
+        .collect();
+
+    for m in moves {
+        ship.execute_move_9001(m);
+    }
+
+    ship.top_str()
 }
 
 #[cfg(test)]
@@ -141,15 +184,15 @@ mod tests {
     const TESTINPUT: &str = include_str!("day05.test");
 
     #[test]
-    fn test_move() {
-        let mut ship = Ship {
-            stacks: vec![
-                vec![' ', 'N', 'Z'],
-                vec!['D', 'C', 'M'],
-                vec![' ', ' ', 'P'],
-            ],
-        };
+    fn test_top() {
+        let ship = Ship::from_str(TESTINPUT).unwrap();
+        assert_eq!(ship.top_str(), "NDP");
+    }
 
+    #[test]
+    fn test_move() {
+        let mut ship = Ship::from_str(TESTINPUT).unwrap();
+        assert_eq!(ship.top_str(), "NDP");
         println!("Before:\n{}", ship);
         ship.execute_move(Move {
             count: 1,
@@ -157,10 +200,37 @@ mod tests {
             to: 1,
         });
         println!("After:\n{}", ship);
+        assert_eq!(ship.top_str(), "DCP");
 
-        assert_eq!(ship.stacks[0], vec!['D', 'N', 'Z']);
-        assert_eq!(ship.stacks[0], vec![' ', 'C', 'M']);
-        assert_eq!(ship.stacks[0], vec![' ', ' ', 'P']);
+        ship.execute_move(Move {
+            count: 3,
+            from: 1,
+            to: 3,
+        });
+        println!("After:\n{}", ship);
+        assert_eq!(ship.top_str(), " CZ");
+    }
+
+    #[test]
+    fn test_move_9001() {
+        let mut ship = Ship::from_str(TESTINPUT).unwrap();
+        assert_eq!(ship.top_str(), "NDP");
+        println!("Before:\n{}", ship);
+        ship.execute_move_9001(Move {
+            count: 1,
+            from: 2,
+            to: 1,
+        });
+        println!("After:\n{}", ship);
+        assert_eq!(ship.top_str(), "DCP");
+
+        ship.execute_move_9001(Move {
+            count: 3,
+            from: 1,
+            to: 3,
+        });
+        println!("After:\n{}", ship);
+        assert_eq!(ship.top_str(), " CD");
     }
 
     #[test]
@@ -170,6 +240,6 @@ mod tests {
 
     #[test]
     fn test_part2() {
-        assert_eq!(part2(TESTINPUT), "");
+        assert_eq!(part2(TESTINPUT), "MCD");
     }
 }
